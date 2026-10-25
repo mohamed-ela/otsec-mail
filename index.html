@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OT-Sec Mail</title>
+<style>
+  :root{
+    --navy: #16233b;
+    --navy-light: #1f3356;
+    --ink: #1a1d24;
+    --paper: #ffffff;
+    --mist: #f3f5f8;
+    --line: #e1e5eb;
+    --accent: #3d6fe0;
+    --accent-dark: #2b53b3;
+    --ok: #1f8a5a;
+    --bad: #c23a3a;
+    --muted: #6b7280;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--mist);color:var(--ink);height:100vh;overflow:hidden;}
+
+  /* ---- Top bar ---- */
+  .topbar{
+    height:56px;background:var(--navy);color:#fff;display:flex;align-items:center;
+    padding:0 20px;gap:16px;
+  }
+  .wordmark{
+    font-size:19px;letter-spacing:0.2px;display:flex;align-items:baseline;gap:6px;
+  }
+  .wordmark b{font-weight:700;}
+  .wordmark span{font-weight:300;color:#aebbd6;}
+  .teamBadge{
+    margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:#cbd5ea;
+  }
+  .teamBadge input{
+    background:var(--navy-light);border:1px solid #2c4269;color:#fff;border-radius:4px;
+    padding:6px 10px;font-size:13px;width:160px;
+  }
+  .teamBadge input:focus{outline:2px solid var(--accent);}
+
+  /* ---- Layout ---- */
+  .shell{display:flex;height:calc(100vh - 56px);}
+  .sidebar{
+    width:220px;background:var(--navy);color:#dbe3f0;padding:18px 12px;flex-shrink:0;
+  }
+  .composeBtn{
+    width:100%;background:var(--accent);color:#fff;border:none;border-radius:6px;
+    padding:12px 14px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:18px;
+    text-align:left;
+  }
+  .composeBtn:hover{background:var(--accent-dark);}
+  .folder{
+    padding:9px 12px;border-radius:6px;font-size:14px;cursor:pointer;display:flex;
+    justify-content:space-between;color:#c4cee4;
+  }
+  .folder.active{background:var(--navy-light);color:#fff;}
+  .folder:hover{background:var(--navy-light);}
+  .folder .count{color:#8fa2c7;font-size:12px;}
+
+  .listPane{
+    width:340px;border-right:1px solid var(--line);background:var(--paper);
+    overflow-y:auto;flex-shrink:0;
+  }
+  .listHeader{
+    padding:14px 18px;font-size:13px;font-weight:700;color:var(--muted);
+    border-bottom:1px solid var(--line);text-transform:none;
+  }
+  .mailItem{
+    padding:14px 18px;border-bottom:1px solid var(--line);cursor:pointer;
+  }
+  .mailItem:hover{background:var(--mist);}
+  .mailItem.selected{background:#eaf0fd;border-left:3px solid var(--accent);}
+  .mailItem .from{font-size:14px;font-weight:600;color:var(--ink);}
+  .mailItem .subj{font-size:13px;color:#374151;margin-top:2px;}
+  .mailItem .snippet{font-size:12.5px;color:var(--muted);margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mailItem .time{font-size:11px;color:var(--muted);float:right;}
+  .mailItem.unread .from, .mailItem.unread .subj{font-weight:700;}
+
+  .readPane{flex:1;background:var(--paper);overflow-y:auto;padding:0;}
+  .readEmpty{
+    display:flex;align-items:center;justify-content:center;height:100%;
+    color:#9aa5b5;font-size:14px;
+  }
+  .readHead{padding:26px 36px 18px;border-bottom:1px solid var(--line);}
+  .readHead h2{margin:0 0 14px;font-size:20px;font-weight:600;}
+  .metaRow{font-size:13px;color:var(--muted);margin:3px 0;}
+  .metaRow b{color:var(--ink);font-weight:600;}
+  .readBody{padding:26px 36px;font-size:14.5px;line-height:1.65;white-space:pre-wrap;}
+
+  /* ---- Compose overlay ---- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(10,15,25,0.35);display:none;
+    align-items:center;justify-content:center;z-index:50;
+  }
+  .overlay.open{display:flex;}
+  .composeCard{
+    width:620px;max-height:88vh;overflow-y:auto;background:var(--paper);border-radius:8px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.25);
+  }
+  .composeTitle{
+    padding:16px 24px;border-bottom:1px solid var(--line);display:flex;
+    justify-content:space-between;align-items:center;font-weight:600;font-size:15px;
+  }
+  .composeTitle button{
+    background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;
+  }
+  .composeBody{padding:20px 24px;}
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;
+    letter-spacing:0.2px;
+  }
+  .field input, .field textarea{
+    width:100%;border:1px solid var(--line);border-radius:5px;padding:9px 11px;
+    font-size:14px;font-family:inherit;color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:70px;}
+  .field input:focus, .field textarea:focus{outline:none;border-color:var(--accent);}
+  .fieldRow{display:flex;gap:12px;}
+  .fieldRow .field{flex:1;}
+  .composeFooter{
+    padding:16px 24px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px;
+  }
+  .sendBtn{
+    background:var(--accent);color:#fff;border:none;border-radius:6px;padding:10px 22px;
+    font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .sendBtn:hover{background:var(--accent-dark);}
+  .sendBtn:disabled{background:#a9b8d6;cursor:not-allowed;}
+  .hint{font-size:12.5px;color:var(--muted);}
+
+  .resultBanner{
+    margin:0 24px 16px;padding:12px 14px;border-radius:6px;font-size:13.5px;display:none;
+  }
+  .resultBanner.show{display:block;}
+  .resultBanner.pass{background:#e8f6ee;color:var(--ok);border:1px solid #bfe3cc;}
+  .resultBanner.fail{background:#fbebeb;color:var(--bad);border:1px solid #efc5c5;}
+  .resultBanner.pending{background:#eef2fb;color:var(--accent-dark);border:1px solid #cfdcf6;}
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="wordmark"><b>OT-Sec</b><span>Mail</span></div>
+    <div class="teamBadge">
+      Signed in as
+      <input id="teamName" placeholder="team or player name" />
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="sidebar">
+      <button class="composeBtn" id="openCompose">+ Compose</button>
+      <div class="folder active" id="folderInbox">Inbox <span class="count" id="inboxCount">3</span></div>
+      <div class="folder" id="folderSent">Sent <span class="count" id="sentCount">0</span></div>
+    </div>
+
+    <div class="listPane" id="listPane"></div>
+
+    <div class="readPane" id="readPane">
+      <div class="readEmpty">Select a message to read</div>
+    </div>
+  </div>
+
+  <!-- Compose overlay -->
+  <div class="overlay" id="overlay">
+    <div class="composeCard">
+      <div class="composeTitle">
+        <span>New message</span>
+        <button id="closeCompose">&times;</button>
+      </div>
+      <div class="resultBanner" id="resultBanner"></div>
+      <div class="composeBody">
+        <div class="fieldRow">
+          <div class="field">
+            <label>Sender address</label>
+            <input id="f-sender" placeholder="e.g. it-support@cwd-helpdesk.com" />
+          </div>
+          <div class="field">
+            <label>Recipient address</label>
+            <input id="f-recipient" placeholder="e.g. f.miller@cwd.com" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Subject</label>
+          <input id="f-subject" placeholder="Subject line" />
+        </div>
+        <div class="field">
+          <label>Greeting</label>
+          <input id="f-greeting" placeholder="e.g. Dear Frank," />
+        </div>
+        <div class="field">
+          <label>Body</label>
+          <textarea id="f-body" placeholder="Write the message body..." style="min-height:140px;"></textarea>
+        </div>
+        <div class="field">
+          <label>Attachment (file name / description)</label>
+          <input id="f-attachment" placeholder="e.g. Q3_Security_Policy_Update.pdf" />
+        </div>
+        <div class="field">
+          <label>Signature</label>
+          <textarea id="f-signature" placeholder="Name, title, company..."></textarea>
+        </div>
+      </div>
+      <div class="composeFooter">
+        <button class="sendBtn" id="sendBtn">Send</button>
+        <span class="hint" id="sendHint">All fields are required to be graded.</span>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ---- CONFIG: fill these in ----
+  // Firebase web config is NOT secret — it's meant to be public.
+  // Access control is enforced by firestore.rules, not by hiding this object.
+  const firebaseConfig = {
+    apiKey: "YOUR_FIREBASE_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // URL of the Cloudflare Worker that proxies the LLM grading call.
+  // This worker — not this page — holds the LLM API key and the credential key.
+  const GRADER_ENDPOINT = "https://otsec-mail-grader.me2890.workers.dev/grade";
+  // --------------------------------
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ---- Generic inbox content (no challenge material here on purpose) ----
+  const inboxMails = [
+    {
+      id: "m1", from: "IT Helpdesk <no-reply@otsec-corp.internal>",
+      subject: "Scheduled maintenance window — Saturday 2–4am",
+      time: "9:02 AM",
+      body: "Hi team,\n\nOur mail and file-sharing services will be briefly unavailable this Saturday between 2:00–4:00 AM for routine maintenance. No action is required on your part.\n\nThanks,\nIT Helpdesk"
+    },
+    {
+      id: "m2", from: "HR Announcements <hr@otsec-corp.internal>",
+      subject: "Reminder: benefits enrollment closes Friday",
+      time: "Yesterday",
+      body: "Hello,\n\nThis is a reminder that open enrollment for next year's benefits closes this Friday at 5 PM. Please log into the HR portal directly to review your selections.\n\nBest,\nHR Team"
+    },
+    {
+      id: "m3", from: "Facilities <facilities@otsec-corp.internal>",
+      subject: "Parking garage B closed for repairs next week",
+      time: "Mon",
+      body: "Good afternoon,\n\nParking garage B will be closed Monday through Wednesday next week for scheduled repairs. Please use garage A or C during this time.\n\nFacilities"
+    }
+  ];
+
+  let sentMails = [];
+  let replyMails = []; // the "you got the credential" reply, if earned
+  let currentFolder = "inbox";
+  let selectedId = null;
+
+  const listPane = document.getElementById("listPane");
+  const readPane = document.getElementById("readPane");
+
+  function renderList() {
+    const items = currentFolder === "inbox" ? [...replyMails, ...inboxMails] : sentMails;
+    document.getElementById("inboxCount").textContent = inboxMails.length + replyMails.length;
+    document.getElementById("sentCount").textContent = sentMails.length;
+
+    if (items.length === 0) {
+      listPane.innerHTML = `<div class="listHeader">${currentFolder === "inbox" ? "Inbox" : "Sent"}</div>
+        <div style="padding:20px;color:#9aa5b5;font-size:13px;">No messages yet.</div>`;
+      return;
+    }
+
+    listPane.innerHTML = `<div class="listHeader">${currentFolder === "inbox" ? "Inbox" : "Sent"}</div>` +
+      items.map(m => `
+        <div class="mailItem ${selectedId === m.id ? 'selected' : ''} ${m.unread ? 'unread' : ''}" data-id="${m.id}">
+          <div class="time">${m.time || ""}</div>
+          <div class="from">${escapeHtml(m.from || m.recipient || "")}</div>
+          <div class="subj">${escapeHtml(m.subject)}</div>
+          <div class="snippet">${escapeHtml((m.body || "").slice(0, 70))}</div>
+        </div>
+      `).join("");
+
+    listPane.querySelectorAll(".mailItem").forEach(el => {
+      el.addEventListener("click", () => {
+        selectedId = el.dataset.id;
+        const m = items.find(x => x.id === selectedId);
+        m.unread = false;
+        renderList();
+        renderRead(m);
+      });
+    });
+  }
+
+  function renderRead(m) {
+    if (!m) {
+      readPane.innerHTML = `<div class="readEmpty">Select a message to read</div>`;
+      return;
+    }
+    readPane.innerHTML = `
+      <div class="readHead">
+        <h2>${escapeHtml(m.subject)}</h2>
+        ${m.from ? `<div class="metaRow"><b>From:</b> ${escapeHtml(m.from)}</div>` : ""}
+        ${m.to ? `<div class="metaRow"><b>To:</b> ${escapeHtml(m.to)}</div>` : ""}
+        ${m.recipient ? `<div class="metaRow"><b>To:</b> ${escapeHtml(m.recipient)}</div>` : ""}
+      </div>
+      <div class="readBody">${escapeHtml(m.body)}</div>
+    `;
+  }
+
+  function escapeHtml(s){
+    return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  document.getElementById("folderInbox").addEventListener("click", () => {
+    currentFolder = "inbox";
+    document.getElementById("folderInbox").classList.add("active");
+    document.getElementById("folderSent").classList.remove("active");
+    selectedId = null; renderList(); renderRead(null);
+  });
+  document.getElementById("folderSent").addEventListener("click", () => {
+    currentFolder = "sent";
+    document.getElementById("folderSent").classList.add("active");
+    document.getElementById("folderInbox").classList.remove("active");
+    selectedId = null; renderList(); renderRead(null);
+  });
+
+  // ---- Compose overlay ----
+  const overlay = document.getElementById("overlay");
+  document.getElementById("openCompose").addEventListener("click", () => overlay.classList.add("open"));
+  document.getElementById("closeCompose").addEventListener("click", () => overlay.classList.remove("open"));
+
+  const banner = document.getElementById("resultBanner");
+  function showBanner(kind, text){
+    banner.className = `resultBanner show ${kind}`;
+    banner.textContent = text;
+  }
+
+  document.getElementById("sendBtn").addEventListener("click", async () => {
+    const team = document.getElementById("teamName").value.trim();
+    const payload = {
+      team: team || "anonymous",
+      sender: document.getElementById("f-sender").value.trim(),
+      recipient: document.getElementById("f-recipient").value.trim(),
+      subject: document.getElementById("f-subject").value.trim(),
+      greeting: document.getElementById("f-greeting").value.trim(),
+      body: document.getElementById("f-body").value.trim(),
+      attachment: document.getElementById("f-attachment").value.trim(),
+      signature: document.getElementById("f-signature").value.trim(),
+    };
+
+    const missing = Object.entries(payload).filter(([k,v]) => k !== "team" && !v).map(([k]) => k);
+    if (missing.length){
+      showBanner("fail", `Missing fields: ${missing.join(", ")}. All components are required.`);
+      return;
+    }
+    if (!team){
+      showBanner("fail", "Enter a team/player name at the top before sending — it's how we score you.");
+      return;
+    }
+
+    const sendBtn = document.getElementById("sendBtn");
+    sendBtn.disabled = true;
+    showBanner("pending", "Sending and grading your email…");
+
+    // Add to Sent folder immediately
+    const sentId = "s" + Date.now();
+    sentMails.unshift({
+      id: sentId, recipient: payload.recipient, subject: payload.subject,
+      time: "Just now", unread: false,
+      body: `Sender: ${payload.sender}\nRecipient: ${payload.recipient}\n\n${payload.greeting}\n\n${payload.body}\n\nAttachment: ${payload.attachment}\n\n${payload.signature}`
+    });
+
+    try {
+      const res = await fetch(GRADER_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showBanner("fail", data.error || "Grading service error — try again.");
+        sendBtn.disabled = false;
+        return;
+      }
+
+      // Store score in Firestore (score only — never the credential key, never full email content required)
+      await addDoc(collection(db, "scores"), {
+        team: payload.team,
+        score: data.score,
+        maxScore: data.maxScore,
+        passed: !!data.passed,
+        createdAt: serverTimestamp()
+      });
+
+      if (data.passed) {
+        showBanner("pass", `Passed — score ${data.score}/${data.maxScore}. Check your Inbox for a reply.`);
+        replyMails.unshift({
+          id: "r" + Date.now(),
+          from: data.replyEmail.from,
+          subject: data.replyEmail.subject,
+          body: data.replyEmail.body,
+          time: "Just now",
+          unread: true
+        });
+        renderList();
+      } else {
+        showBanner("fail", `Not yet — score ${data.score}/${data.maxScore}. Revise and resend.`);
+      }
+    } catch (err) {
+      showBanner("fail", "Couldn't reach the grading service. Check your connection and try again.");
+    }
+
+    sendBtn.disabled = false;
+    renderList();
+  });
+
+  // init
+  renderList();
+</script>
+</body>
+</html>
